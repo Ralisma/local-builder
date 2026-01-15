@@ -1,25 +1,22 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 // Import Puck core components and types
-// We use DropZone to allow components to be dropped inside Sections
 import { Puck, type Config, type Data, DropZone } from "@puckeditor/core";
 
 /**
- * FIX: Direct path to distribution CSS.
- * This is the standard workaround for Vite environments that struggle with 
- * the package's internal export map.
+ * Direct path to distribution CSS.
+ * Using the direct dist path ensures that the styles are correctly loaded
+ * in environments that may have issues with package export maps.
  */
 import "@puckeditor/core/dist/index.css";
 
-// Utilities for project generation and export
+// Utilities for project generation and file saving
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
-import { AlertCircle } from "lucide-react";
+import { Lock, Unlock, ChevronDown, Monitor, Download, Layout, Settings, Layers } from "lucide-react";
 
-// --- Shadcn UI Imports ---
-/**
- * These imports assume you have run the following in your terminal:
- * npx shadcn@latest add accordion alert badge button card input label progress separator
- */
+// --- Shadcn UI Mock Components (to ensure local-builder functionality) ---
+// Note: In your local environment, ensure you have run the shadcn add commands for:
+// accordion, alert, badge, button, card, input, label, progress, separator
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -56,13 +53,12 @@ type RootProps = {
 };
 
 const config: Config<Props, RootProps> = {
-  // --- Root / Page Settings ---
   root: {
     fields: {
-      canvasColor: { type: "text", label: "Canvas Background (Hex/CSS)" },
+      canvasColor: { type: "text", label: "Canvas Background" },
       maxWidth: { 
         type: "select", 
-        label: "Page Max Width",
+        label: "Max Width",
         options: [
           { label: "Standard (1200px)", value: "max-w-6xl" },
           { label: "Wide (1500px)", value: "max-w-7xl" },
@@ -71,12 +67,12 @@ const config: Config<Props, RootProps> = {
       }
     },
     defaultProps: {
-      canvasColor: "#f9fafb",
+      canvasColor: "#ffffff",
       maxWidth: "max-w-6xl"
     },
     render: ({ children, canvasColor, maxWidth }) => (
-      <div className="min-h-screen w-full transition-colors duration-300" style={{ backgroundColor: canvasColor }}>
-        <div className={`mx-auto p-4 space-y-8 ${maxWidth}`}>
+      <div className="min-h-screen w-full transition-all duration-500 ease-in-out" style={{ backgroundColor: canvasColor }}>
+        <div className={`mx-auto p-8 space-y-0 ${maxWidth}`}>
           {children}
         </div>
       </div>
@@ -90,48 +86,36 @@ const config: Config<Props, RootProps> = {
     Feedback: { components: ["Alert"] },
   },
   components: {
-    // Advanced Section Component (Section 1, 2, 3...)
     Section: {
       fields: {
-        sectionTitle: { type: "text", label: "Admin Label (e.g. Hero Section)" },
-        columns: {
-          type: "number",
-          label: "Columns (1-6)",
-        },
-        gap: {
-          type: "number",
-          label: "Grid Gap (px)",
-        },
-        paddingY: {
-          type: "number",
-          label: "Vertical Padding / Row Size (px)",
-        },
-        bgColor: {
-          type: "text",
-          label: "Section Background Color",
-        }
+        sectionTitle: { type: "text", label: "Section Title" },
+        columns: { type: "number", label: "Cols (1-6)" },
+        gap: { type: "number", label: "Gap (px)" },
+        paddingY: { type: "number", label: "Vertical Padding" },
+        bgColor: { type: "text", label: "BG Color" }
       },
       defaultProps: {
         sectionTitle: "New Section",
         columns: 1,
         gap: 24,
-        paddingY: 40,
+        paddingY: 64,
         bgColor: "transparent",
       },
       render: ({ columns, gap, paddingY, bgColor, sectionTitle }) => (
         <section 
-          className="rounded-xl border border-dashed border-muted-foreground/30 relative min-h-[100px]"
+          className="relative border border-dashed border-gray-200 transition-all hover:border-gray-300"
           style={{ 
             backgroundColor: bgColor,
             paddingTop: `${paddingY}px`,
             paddingBottom: `${paddingY}px`,
-            paddingLeft: '20px',
-            paddingRight: '20px'
+            paddingLeft: '24px',
+            paddingRight: '24px'
           }}
         >
-          {/* Label for ease of use in the builder */}
-          <div className="absolute -top-3 left-4 bg-primary text-primary-foreground text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider z-10">
-            {sectionTitle}
+          <div className="absolute -top-3 left-6 z-10">
+             <span className="bg-zinc-800 text-white text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded shadow-sm">
+               {sectionTitle}
+             </span>
           </div>
           <div 
             className="grid w-full" 
@@ -147,53 +131,53 @@ const config: Config<Props, RootProps> = {
     },
     Card: {
       render: ({ title, description, content, footer }) => (
-        <Card className="w-full h-full">
+        <Card className="w-full h-full border-none shadow-md">
           <CardHeader>
             <CardTitle>{title}</CardTitle>
             <CardDescription>{description}</CardDescription>
           </CardHeader>
           <CardContent>{content}</CardContent>
-          {footer && <CardFooter>{footer}</CardFooter>}
+          {footer && <CardFooter className="text-xs text-muted-foreground">{footer}</CardFooter>}
         </Card>
       ),
-      defaultProps: { title: "Card Title", description: "Description", content: "Main Content", footer: "" },
+      defaultProps: { title: "Title", description: "Subtitle", content: "Main body text...", footer: "" },
       fields: { title: { type: "text" }, description: { type: "text" }, content: { type: "textarea" }, footer: { type: "text" } },
     },
     Button: {
-      render: ({ text, variant, size }) => <Button variant={variant} size={size} className="w-full">{text}</Button>,
-      defaultProps: { text: "Button", variant: "default", size: "default" },
+      render: ({ text, variant, size }) => <Button variant={variant} size={size} className="w-full shadow-sm">{text}</Button>,
+      defaultProps: { text: "Action Button", variant: "default", size: "default" },
       fields: { 
         text: { type: "text" }, 
-        variant: { type: "select", options: [{ label: "Default", value: "default" }, { label: "Destructive", value: "destructive" }, { label: "Outline", value: "outline" }] },
+        variant: { type: "select", options: [{ label: "Default", value: "default" }, { label: "Destructive", value: "destructive" }, { label: "Outline", value: "outline" }, { label: "Secondary", value: "secondary" }] },
         size: { type: "select", options: [{ label: "Default", value: "default" }, { label: "Small", value: "sm" }, { label: "Large", value: "lg" }] }
       },
     },
     Input: {
       render: ({ placeholder, label, type }) => (
-        <div className="grid w-full items-center gap-1.5 p-1">
-          <Label className="mb-1">{label}</Label>
-          <Input type={type} placeholder={placeholder} />
+        <div className="space-y-1.5">
+          <Label className="text-xs font-bold text-gray-500 uppercase tracking-tight">{label}</Label>
+          <Input type={type} placeholder={placeholder} className="bg-white border-gray-200" />
         </div>
       ),
-      defaultProps: { placeholder: "Email", label: "Email", type: "email" },
+      defaultProps: { placeholder: "name@example.com", label: "Email", type: "email" },
       fields: { label: { type: "text" }, placeholder: { type: "text" }, type: { type: "select", options: [{ label: "Text", value: "text" }, { label: "Email", value: "email" }] } }
     },
     Accordion: {
       render: ({ items }) => (
-        <Accordion type="single" collapsible className="w-full">
+        <Accordion type="single" collapsible className="w-full bg-white rounded-lg px-4 border border-gray-100">
           {items.map((item, i) => (
             <AccordionItem key={i} value={`item-${i}`}>
-              <AccordionTrigger>{item.title}</AccordionTrigger>
-              <AccordionContent>{item.content}</AccordionContent>
+              <AccordionTrigger className="text-sm">{item.title}</AccordionTrigger>
+              <AccordionContent className="text-gray-600">{item.content}</AccordionContent>
             </AccordionItem>
           ))}
         </Accordion>
       ),
-      defaultProps: { items: [{ title: "New Item", content: "Content text" }] },
+      defaultProps: { items: [{ title: "Helpful Tip", content: "Detailed info here." }] },
       fields: { items: { type: "array", arrayFields: { title: { type: "text" }, content: { type: "textarea" } } } },
     },
     Separator: {
-      render: ({ orientation }) => <Separator orientation={orientation} className="my-4" />,
+      render: ({ orientation }) => <Separator orientation={orientation} className="bg-gray-100" />,
       defaultProps: { orientation: "horizontal" },
       fields: { orientation: { type: "select", options: [{ label: "Horizontal", value: "horizontal" }, { label: "Vertical", value: "vertical" }] } },
     },
@@ -204,10 +188,10 @@ const config: Config<Props, RootProps> = {
     },
     Alert: {
       render: ({ title, description, variant }) => (
-        <Alert variant={variant}>
+        <Alert variant={variant} className="bg-white">
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>{title}</AlertTitle>
-          <AlertDescription>{description}</AlertDescription>
+          <AlertTitle className="text-sm font-bold">{title}</AlertTitle>
+          <AlertDescription className="text-xs">{description}</AlertDescription>
         </Alert>
       ),
       defaultProps: { title: "Heads up!", description: "Add a description.", variant: "default" },
@@ -216,11 +200,11 @@ const config: Config<Props, RootProps> = {
     Progress: {
       render: ({ value, label }) => (
         <div className="w-full space-y-2">
-          <Label>{label}</Label>
-          <Progress value={value} />
+          <Label className="text-[10px] uppercase font-bold text-gray-400">{label}</Label>
+          <Progress value={value} className="h-1.5" />
         </div>
       ),
-      defaultProps: { value: 33, label: "Loading..." },
+      defaultProps: { value: 50, label: "Setup Progress" },
       fields: { value: { type: "number" }, label: { type: "text" } }
     }
   },
@@ -242,7 +226,6 @@ const COMPONENT_MAP: Record<string, { path: string; imports: string[]; cli: stri
 
 const generateJSX = (item: any, data: Data): string => {
   const { type, props } = item;
-  
   switch (type) {
     case "Section": {
       const zoneKey = `${item.readOnly?.puckId}:section-content`;
@@ -257,7 +240,7 @@ const generateJSX = (item: any, data: Data): string => {
         }}
       >
         <div 
-          className="grid w-full" 
+          className="grid w-full px-6" 
           style={{ 
             gridTemplateColumns: 'repeat(${props.columns}, minmax(0, 1fr))', 
             gap: '${props.gap}px' 
@@ -313,8 +296,8 @@ ${importStr}
 
 export default function ${page.name}() {
   return (
-    <div className="min-h-screen w-full" style={{ backgroundColor: '${rootProps.canvasColor}' }}>
-      <div className="mx-auto px-4 space-y-12 ${rootProps.maxWidth}">
+    <div className="min-h-screen w-full transition-all" style={{ backgroundColor: '${rootProps.canvasColor}' }}>
+      <div className="mx-auto ${rootProps.maxWidth}">
         ${jsx}
       </div>
     </div>
@@ -332,36 +315,166 @@ export default function ${page.name}() {
 
 // --- 3. MAIN UI COMPONENT ---
 export default function App() {
+  const [uiLocked, setUiLocked] = useState(true);
+  const [showDropdown, setShowDropdown] = useState(false);
+
   const initialData = useMemo(() => ({ 
     content: [], 
-    root: { props: { canvasColor: "#f9fafb", maxWidth: "max-w-6xl" } }, 
+    root: { props: { canvasColor: "#ffffff", maxWidth: "max-w-6xl" } }, 
     zones: {} 
   }), []);
 
+  // Close dropdown on click outside
+  useEffect(() => {
+    const close = () => setShowDropdown(false);
+    if (showDropdown) {
+      window.addEventListener('click', close);
+      return () => window.removeEventListener('click', close);
+    }
+  }, [showDropdown]);
+
   return (
-    <div style={{ 
-      position: "fixed", 
-      top: 0, 
-      left: 0, 
-      right: 0, 
-      bottom: 0, 
-      height: "100vh", 
-      width: "100vw", 
-      display: "flex", 
-      flexDirection: "column", 
-      background: "#f9fafb" 
-    }}>
-      <Puck
-        config={config}
-        data={initialData}
-        onPublish={async (data) => {
-          try {
-            await saveProject([{ path: "/", name: "Home", data }], data.root.props as RootProps);
-          } catch (error) {
-            console.error("Export failed:", error);
+    <div className="fixed inset-0 flex flex-col bg-white overflow-hidden font-sans">
+      {/* Dynamic Styles for Hover-to-Show Sidebars */}
+      <style>{`
+        /* Target internal Puck Sidebar Classes */
+        ${!uiLocked ? `
+          [class*="Puck-Sidebar"] {
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1) !important;
+            opacity: 0.05;
+            z-index: 200 !important;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
           }
-        }}
-      />
+          /* Left Sidebar Hide */
+          [class*="Puck-Sidebar"]:first-of-type {
+            transform: translateX(-98%);
+            border-right: 4px solid #f3f4f6 !important;
+          }
+          /* Right Sidebar Hide */
+          [class*="Puck-Sidebar"]:last-of-type {
+            transform: translateX(98%);
+            border-left: 4px solid #f3f4f6 !important;
+          }
+          /* Hover Zone Triggers */
+          [class*="Puck-Sidebar"]:first-of-type:hover {
+            transform: translateX(0);
+            opacity: 1;
+            border-right-width: 1px !important;
+          }
+          [class*="Puck-Sidebar"]:last-of-type:hover {
+            transform: translateX(0);
+            opacity: 1;
+            border-left-width: 1px !important;
+          }
+          /* Expand Canvas when sidebars are hidden */
+          [class*="Puck-Canvas"] {
+            margin: 0 !important;
+            width: 100% !important;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1) !important;
+          }
+        ` : ''}
+
+        /* Customize scrollbars for a cleaner look */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #d1d5db; }
+      `}</style>
+
+      {/* Top Settings Header */}
+      <header className="h-[48px] w-full border-bottom border-gray-100 flex items-center justify-between px-4 z-[400] bg-white relative">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 mr-4">
+            <div className="w-6 h-6 bg-zinc-900 rounded-md flex items-center justify-center">
+              <Monitor size={14} className="text-white" />
+            </div>
+            <span className="text-sm font-bold text-zinc-900 tracking-tight">Shadcn Maker</span>
+          </div>
+
+          <div className="relative">
+            <button 
+              onClick={(e) => { e.stopPropagation(); setShowDropdown(!showDropdown); }}
+              className={`flex items-center gap-2 text-[12px] font-semibold px-3 py-1.5 rounded-full transition-all border ${
+                uiLocked 
+                  ? "bg-zinc-50 border-zinc-200 text-zinc-600" 
+                  : "bg-blue-50 border-blue-100 text-blue-600"
+              }`}
+            >
+              {uiLocked ? <Lock size={12} /> : <Unlock size={12} />}
+              UI Layout: {uiLocked ? "Locked" : "Dynamic"}
+              <ChevronDown size={12} className={`transition-transform duration-200 ${showDropdown ? "rotate-180" : ""}`} />
+            </button>
+
+            {showDropdown && (
+              <div 
+                onClick={(e) => e.stopPropagation()}
+                className="absolute top-10 left-0 w-56 bg-white rounded-xl shadow-2xl border border-gray-100 p-1.5 space-y-1 animate-in fade-in slide-in-from-top-2 duration-200"
+              >
+                <div className="px-3 py-2 text-[10px] font-black text-gray-400 uppercase tracking-widest">Workspace Controls</div>
+                <button 
+                  onClick={() => { setUiLocked(true); setShowDropdown(false); }}
+                  className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${uiLocked ? "bg-zinc-50 text-zinc-900" : "hover:bg-gray-50 text-gray-600"}`}
+                >
+                  <div className={`p-1 rounded ${uiLocked ? "bg-zinc-200" : "bg-gray-100"}`}><Lock size={14} /></div>
+                  <div className="text-left">
+                    <div className="font-bold leading-tight">Fixed UI</div>
+                    <div className="text-[10px] text-gray-500">Sidebars always visible</div>
+                  </div>
+                </button>
+                <button 
+                  onClick={() => { setUiLocked(false); setShowDropdown(false); }}
+                  className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${!uiLocked ? "bg-blue-50 text-blue-700" : "hover:bg-gray-50 text-gray-600"}`}
+                >
+                  <div className={`p-1 rounded ${!uiLocked ? "bg-blue-200 text-blue-700" : "bg-gray-100"}`}><Unlock size={14} /></div>
+                  <div className="text-left">
+                    <div className="font-bold leading-tight">Hover Mode</div>
+                    <div className="text-[10px] text-gray-400">Hidden until mouse near edges</div>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 text-gray-400">
+           <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest border-r pr-3 mr-1">
+             <Settings size={12} /> Config
+           </div>
+           <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest border-r pr-3 mr-1">
+             <Layers size={12} /> Layers
+           </div>
+           <div className="text-[11px] font-medium italic text-gray-300 pr-2">
+             v1.2.0 stable
+           </div>
+        </div>
+      </header>
+
+      {/* Main Workspace */}
+      <main className="flex-1 relative overflow-hidden bg-gray-50">
+        <Puck
+          config={config}
+          data={initialData}
+          onPublish={async (data) => {
+            try {
+              await saveProject([{ path: "/", name: "Home", data }], data.root.props as RootProps);
+            } catch (error) {
+              console.error("Project export failed:", error);
+            }
+          }}
+        />
+      </main>
+
+      {/* Fixed Watermark - Bottom Right
+          Positioned here to avoid any interaction with the left sidebar or the right settings panel.
+      */}
+      <div className="fixed bottom-6 right-6 z-[500] pointer-events-none group">
+        <div className="flex items-center gap-2 bg-white/60 backdrop-blur-md px-3 py-2 rounded-xl border border-white shadow-xl transform transition-transform duration-300 hover:scale-105">
+           <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+           <span className="text-[10px] font-black text-zinc-600 uppercase tracking-widest leading-none">
+             website builder using vite & shadcn by Ral
+           </span>
+        </div>
+      </div>
     </div>
   );
 }
