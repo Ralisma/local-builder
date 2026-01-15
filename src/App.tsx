@@ -12,7 +12,7 @@ import "@puckeditor/core/dist/index.css";
 // Utilities for project generation and file saving
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
-import { Lock, Unlock, ChevronDown, Monitor, Download, Layout, Settings, Layers } from "lucide-react";
+import { Lock, Unlock, ChevronDown, Monitor, Download, Layout, Settings, Layers, File, Plus, Trash2, ChevronRight } from "lucide-react";
 
 // --- Shadcn UI Mock Components (to ensure local-builder functionality) ---
 // Note: In your local environment, ensure you have run the shadcn add commands for:
@@ -37,7 +37,13 @@ type Props = {
     bgColor: string;
     sectionTitle: string;
   };
-  Button: { text: string; variant: "default" | "destructive" | "outline" | "secondary"; size: "default" | "sm" | "lg" };
+  Button: { 
+    text: string; 
+    variant: "default" | "destructive" | "outline" | "secondary"; 
+    size: "default" | "sm" | "lg";
+    actionType: "none" | "link" | "alert";
+    actionTarget: string;
+  };
   Badge: { text: string; variant: "default" | "secondary" | "outline" };
   Card: { title: string; description: string; content: string; footer: string };
   Accordion: { items: { title: string; content: string }[] };
@@ -50,11 +56,15 @@ type Props = {
 type RootProps = {
   canvasColor: string;
   maxWidth: string;
+  pageTitle: string;
+  pageRoute: string;
 };
 
 const config: Config<Props, RootProps> = {
   root: {
     fields: {
+      pageTitle: { type: "text", label: "Page Title" },
+      pageRoute: { type: "text", label: "Page Route (e.g. /about)" },
       canvasColor: { type: "text", label: "Canvas Background" },
       maxWidth: { 
         type: "select", 
@@ -67,6 +77,8 @@ const config: Config<Props, RootProps> = {
       }
     },
     defaultProps: {
+      pageTitle: "Home",
+      pageRoute: "/",
       canvasColor: "#ffffff",
       maxWidth: "max-w-6xl"
     },
@@ -84,6 +96,7 @@ const config: Config<Props, RootProps> = {
     Forms: { components: ["Button", "Input"] },
     Display: { components: ["Badge", "Progress"] },
     Feedback: { components: ["Alert"] },
+    Pages: { components: [] } // Added Pages category placeholder
   },
   components: {
     Section: {
@@ -124,7 +137,11 @@ const config: Config<Props, RootProps> = {
               gap: `${gap || 16}px`
             }}
           >
-            <DropZone zone="section-content" />
+            {Array.from({ length: columns || 1 }).map((_, i) => (
+              <div key={i} className="flex flex-col gap-4">
+                <DropZone zone={`col-${i}`} />
+              </div>
+            ))}
           </div>
         </section>
       ),
@@ -144,12 +161,35 @@ const config: Config<Props, RootProps> = {
       fields: { title: { type: "text" }, description: { type: "text" }, content: { type: "textarea" }, footer: { type: "text" } },
     },
     Button: {
-      render: ({ text, variant, size }) => <Button variant={variant} size={size} className="w-full shadow-sm">{text}</Button>,
-      defaultProps: { text: "Action Button", variant: "default", size: "default" },
+      render: ({ text, variant, size, actionType, actionTarget }) => (
+        <Button 
+          variant={variant} 
+          size={size} 
+          className="w-full shadow-sm"
+          onClick={() => {
+            if (actionType === "link" && actionTarget) {
+              window.location.href = actionTarget;
+            } else if (actionType === "alert" && actionTarget) {
+              alert(actionTarget);
+            }
+          }}
+        >
+          {text}
+        </Button>
+      ),
+      defaultProps: { 
+        text: "Action Button", 
+        variant: "default", 
+        size: "default",
+        actionType: "none",
+        actionTarget: ""
+      },
       fields: { 
         text: { type: "text" }, 
         variant: { type: "select", options: [{ label: "Default", value: "default" }, { label: "Destructive", value: "destructive" }, { label: "Outline", value: "outline" }, { label: "Secondary", value: "secondary" }] },
-        size: { type: "select", options: [{ label: "Default", value: "default" }, { label: "Small", value: "sm" }, { label: "Large", value: "lg" }] }
+        size: { type: "select", options: [{ label: "Default", value: "default" }, { label: "Small", value: "sm" }, { label: "Large", value: "lg" }] },
+        actionType: { type: "radio", options: [{ label: "None", value: "none" }, { label: "Link", value: "link" }, { label: "Pop-up Alert", value: "alert" }] },
+        actionTarget: { type: "text", label: "Target URL or Message" }
       },
     },
     Input: {
@@ -228,9 +268,18 @@ const generateJSX = (item: any, data: Data): string => {
   const { type, props } = item;
   switch (type) {
     case "Section": {
-      const zoneKey = `${item.readOnly?.puckId}:section-content`;
-      const zoneItems = data.zones?.[zoneKey] || [];
-      const zoneContent = zoneItems.map(zi => generateJSX(zi, data)).join("\n        ");
+      // Need to iterate through columns to get content for each zone
+      const colCount = props.columns || 1;
+      const columnsJSX = Array.from({ length: colCount }).map((_, i) => {
+        const zoneKey = `${item.readOnly?.puckId}:col-${i}`;
+        const zoneItems = data.zones?.[zoneKey] || [];
+        const zoneContent = zoneItems.map(zi => generateJSX(zi, data)).join("\n          ");
+        return `
+        <div className="flex flex-col gap-4">
+          ${zoneContent}
+        </div>`;
+      }).join("\n");
+
       return `
       <section 
         style={{ 
@@ -246,12 +295,17 @@ const generateJSX = (item: any, data: Data): string => {
             gap: '${props.gap}px' 
           }}
         >
-          ${zoneContent}
+          ${columnsJSX}
         </div>
       </section>`;
     }
     case "Card": return `<Card><CardHeader><CardTitle>${props.title}</CardTitle><CardDescription>${props.description}</CardDescription></CardHeader><CardContent>${props.content}</CardContent>${props.footer ? `<CardFooter>${props.footer}</CardFooter>` : ""}</Card>`;
-    case "Button": return `<Button variant="${props.variant}" size="${props.size}">${props.text}</Button>`;
+    case "Button": {
+      let onClick = "";
+      if (props.actionType === "link" && props.actionTarget) onClick = ` onClick={() => window.location.href = "${props.actionTarget}"}`;
+      if (props.actionType === "alert" && props.actionTarget) onClick = ` onClick={() => alert("${props.actionTarget}")}`;
+      return `<Button variant="${props.variant}" size="${props.size}"${onClick}>${props.text}</Button>`;
+    }
     case "Badge": return `<Badge variant="${props.variant}">${props.text}</Badge>`;
     case "Separator": return `<Separator orientation="${props.orientation}" />`;
     case "Alert": return `<Alert variant="${props.variant}"><AlertCircle className="h-4 w-4" /><AlertTitle>${props.title}</AlertTitle><AlertDescription>${props.description}</AlertDescription></Alert>`;
@@ -262,11 +316,20 @@ const generateJSX = (item: any, data: Data): string => {
   }
 };
 
-async function saveProject(pages: { path: string; name: string; data: Data }[], rootProps: RootProps) {
+// Data structure for a page
+interface Page {
+  id: string;
+  data: Data;
+}
+
+async function saveProject(pages: Page[], rootProps: RootProps) {
   const zip = new JSZip();
   const allUsedComponents = new Set<string>();
 
   pages.forEach((page) => {
+    const pageProps = page.data.root.props as RootProps;
+    const pageName = pageProps.pageTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase() || "untitled";
+    
     const usedOnPage = new Set<string>();
     const findUsed = (items: any[]) => {
       items.forEach(i => {
@@ -294,16 +357,17 @@ import React from 'react';
 import { AlertCircle } from "lucide-react";
 ${importStr}
 
-export default function ${page.name}() {
+export default function ${pageName.charAt(0).toUpperCase() + pageName.slice(1)}() {
   return (
-    <div className="min-h-screen w-full transition-all" style={{ backgroundColor: '${rootProps.canvasColor}' }}>
-      <div className="mx-auto ${rootProps.maxWidth}">
+    <div className="min-h-screen w-full transition-all" style={{ backgroundColor: '${pageProps.canvasColor}' }}>
+      <div className="mx-auto ${pageProps.maxWidth}">
         ${jsx}
       </div>
     </div>
   );
 }`;
-    zip.folder("src")?.folder("pages")?.file(`${page.name}.tsx`, code.trim());
+    // Use the pageTitle or ID for the filename
+    zip.folder("src")?.folder("pages")?.file(`${pageName}.tsx`, code.trim());
     usedOnPage.forEach(u => allUsedComponents.add(u));
   });
 
@@ -315,166 +379,147 @@ export default function ${page.name}() {
 
 // --- 3. MAIN UI COMPONENT ---
 export default function App() {
-  const [uiLocked, setUiLocked] = useState(true);
-  const [showDropdown, setShowDropdown] = useState(false);
-
-  const initialData = useMemo(() => ({ 
-    content: [], 
-    root: { props: { canvasColor: "#ffffff", maxWidth: "max-w-6xl" } }, 
-    zones: {} 
-  }), []);
-
-  // Close dropdown on click outside
-  useEffect(() => {
-    const close = () => setShowDropdown(false);
-    if (showDropdown) {
-      window.addEventListener('click', close);
-      return () => window.removeEventListener('click', close);
+  const [pages, setPages] = useState<Page[]>([
+    { 
+      id: "home", 
+      data: { 
+        content: [], 
+        root: { 
+          props: { 
+            pageTitle: "Home", 
+            pageRoute: "/", 
+            canvasColor: "#ffffff", 
+            maxWidth: "max-w-6xl" 
+          } 
+        }, 
+        zones: {} 
+      } 
     }
-  }, [showDropdown]);
+  ]);
+  const [selectedPageId, setSelectedPageId] = useState("home");
+
+  const currentPage = useMemo(() => pages.find(p => p.id === selectedPageId), [pages, selectedPageId]);
+
+  const handleAddPage = () => {
+    const newId = crypto.randomUUID();
+    const newPage: Page = {
+      id: newId,
+      data: {
+        content: [],
+        root: {
+          props: {
+            pageTitle: "New Page",
+            pageRoute: "/new-page",
+            canvasColor: "#ffffff",
+            maxWidth: "max-w-6xl"
+          }
+        },
+        zones: {}
+      }
+    };
+    setPages([...pages, newPage]);
+    setSelectedPageId(newId);
+  };
+
+  const handleDeletePage = () => {
+    if (pages.length <= 1) {
+      alert("Cannot delete the last page.");
+      return;
+    }
+    const newPages = pages.filter(p => p.id !== selectedPageId);
+    setPages(newPages);
+    setSelectedPageId(newPages[0].id);
+  };
+
+  const handlePageDataChange = (newData: Data) => {
+    setPages(prev => prev.map(p => p.id === selectedPageId ? { ...p, data: newData } : p));
+  };
 
   return (
     <div className="fixed inset-0 flex flex-col bg-white overflow-hidden font-sans">
-      {/* Dynamic Styles for Hover-to-Show Sidebars */}
+      {/* Customize scrollbars for a cleaner look */}
       <style>{`
-        /* Target internal Puck Sidebar Classes */
-        ${!uiLocked ? `
-          [class*="Puck-Sidebar"] {
-            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1) !important;
-            opacity: 0.05;
-            z-index: 200 !important;
-            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
-          }
-          /* Left Sidebar Hide */
-          [class*="Puck-Sidebar"]:first-of-type {
-            transform: translateX(-98%);
-            border-right: 4px solid #f3f4f6 !important;
-          }
-          /* Right Sidebar Hide */
-          [class*="Puck-Sidebar"]:last-of-type {
-            transform: translateX(98%);
-            border-left: 4px solid #f3f4f6 !important;
-          }
-          /* Hover Zone Triggers */
-          [class*="Puck-Sidebar"]:first-of-type:hover {
-            transform: translateX(0);
-            opacity: 1;
-            border-right-width: 1px !important;
-          }
-          [class*="Puck-Sidebar"]:last-of-type:hover {
-            transform: translateX(0);
-            opacity: 1;
-            border-left-width: 1px !important;
-          }
-          /* Expand Canvas when sidebars are hidden */
-          [class*="Puck-Canvas"] {
-            margin: 0 !important;
-            width: 100% !important;
-            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1) !important;
-          }
-        ` : ''}
-
-        /* Customize scrollbars for a cleaner look */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 10px; }
         ::-webkit-scrollbar-thumb:hover { background: #d1d5db; }
       `}</style>
 
-      {/* Top Settings Header */}
-      <header className="h-[48px] w-full border-bottom border-gray-100 flex items-center justify-between px-4 z-[400] bg-white relative">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 mr-4">
-            <div className="w-6 h-6 bg-zinc-900 rounded-md flex items-center justify-center">
-              <Monitor size={14} className="text-white" />
-            </div>
-            <span className="text-sm font-bold text-zinc-900 tracking-tight">Shadcn Maker</span>
-          </div>
-
-          <div className="relative">
-            <button 
-              onClick={(e) => { e.stopPropagation(); setShowDropdown(!showDropdown); }}
-              className={`flex items-center gap-2 text-[12px] font-semibold px-3 py-1.5 rounded-full transition-all border ${
-                uiLocked 
-                  ? "bg-zinc-50 border-zinc-200 text-zinc-600" 
-                  : "bg-blue-50 border-blue-100 text-blue-600"
-              }`}
-            >
-              {uiLocked ? <Lock size={12} /> : <Unlock size={12} />}
-              UI Layout: {uiLocked ? "Locked" : "Dynamic"}
-              <ChevronDown size={12} className={`transition-transform duration-200 ${showDropdown ? "rotate-180" : ""}`} />
-            </button>
-
-            {showDropdown && (
-              <div 
-                onClick={(e) => e.stopPropagation()}
-                className="absolute top-10 left-0 w-56 bg-white rounded-xl shadow-2xl border border-gray-100 p-1.5 space-y-1 animate-in fade-in slide-in-from-top-2 duration-200"
-              >
-                <div className="px-3 py-2 text-[10px] font-black text-gray-400 uppercase tracking-widest">Workspace Controls</div>
-                <button 
-                  onClick={() => { setUiLocked(true); setShowDropdown(false); }}
-                  className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${uiLocked ? "bg-zinc-50 text-zinc-900" : "hover:bg-gray-50 text-gray-600"}`}
-                >
-                  <div className={`p-1 rounded ${uiLocked ? "bg-zinc-200" : "bg-gray-100"}`}><Lock size={14} /></div>
-                  <div className="text-left">
-                    <div className="font-bold leading-tight">Fixed UI</div>
-                    <div className="text-[10px] text-gray-500">Sidebars always visible</div>
-                  </div>
-                </button>
-                <button 
-                  onClick={() => { setUiLocked(false); setShowDropdown(false); }}
-                  className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${!uiLocked ? "bg-blue-50 text-blue-700" : "hover:bg-gray-50 text-gray-600"}`}
-                >
-                  <div className={`p-1 rounded ${!uiLocked ? "bg-blue-200 text-blue-700" : "bg-gray-100"}`}><Unlock size={14} /></div>
-                  <div className="text-left">
-                    <div className="font-bold leading-tight">Hover Mode</div>
-                    <div className="text-[10px] text-gray-400">Hidden until mouse near edges</div>
-                  </div>
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3 text-gray-400">
-           <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest border-r pr-3 mr-1">
-             <Settings size={12} /> Config
-           </div>
-           <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest border-r pr-3 mr-1">
-             <Layers size={12} /> Layers
-           </div>
-           <div className="text-[11px] font-medium italic text-gray-300 pr-2">
-             v1.2.0 stable
-           </div>
-        </div>
-      </header>
-
       {/* Main Workspace */}
       <main className="flex-1 relative overflow-hidden bg-gray-50">
-        <Puck
-          config={config}
-          data={initialData}
-          onPublish={async (data) => {
-            try {
-              await saveProject([{ path: "/", name: "Home", data }], data.root.props as RootProps);
-            } catch (error) {
-              console.error("Project export failed:", error);
-            }
-          }}
-        />
-      </main>
+        {currentPage && (
+          <Puck
+            key={selectedPageId} // Force re-render when page changes
+            config={config}
+            data={currentPage.data}
+            onChange={handlePageDataChange}
+            onPublish={async () => {
+              try {
+                await saveProject(pages, currentPage.data.root.props as RootProps);
+              } catch (error) {
+                console.error("Project export failed:", error);
+              }
+            }}
+            overrides={{
+              header: ({ actions }) => (
+                <header className="h-[48px] w-full border-b border-gray-100 flex items-center justify-between px-4 z-[400] bg-white relative">
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 mr-4 text-sm font-medium text-gray-600">
+                      <span className="flex items-center gap-1"><Monitor size={14} /> App</span>
+                      <ChevronRight size={14} className="text-gray-400" />
+                      <span className="text-zinc-900 font-bold">{currentPage.data.root.props.pageTitle}</span>
+                      <span className="text-xs text-gray-400 ml-1 font-mono">({currentPage.data.root.props.pageRoute})</span>
+                    </div>
 
-      {/* Fixed Watermark - Bottom Right
-          Positioned here to avoid any interaction with the left sidebar or the right settings panel.
-      */}
-      <div className="fixed bottom-6 right-6 z-[500] pointer-events-none group">
-        <div className="flex items-center gap-2 bg-white/60 backdrop-blur-md px-3 py-2 rounded-xl border border-white shadow-xl transform transition-transform duration-300 hover:scale-105">
-           <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-           <span className="text-[10px] font-black text-zinc-600 uppercase tracking-widest leading-none">
-             website builder using vite & shadcn by Ral
-           </span>
-        </div>
-      </div>
+                    <div className="flex items-center gap-2 bg-gray-100 p-1 rounded-lg">
+                      <div className="relative group">
+                        <select 
+                          value={selectedPageId}
+                          onChange={(e) => setSelectedPageId(e.target.value)}
+                          className="appearance-none bg-white border border-gray-200 text-xs font-medium pl-8 pr-8 py-1.5 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer min-w-[140px]"
+                        >
+                          {pages.map(p => (
+                            <option key={p.id} value={p.id}>
+                              {p.data.root.props.pageTitle}
+                            </option>
+                          ))}
+                        </select>
+                        <File size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+                        <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                      </div>
+
+                      <div className="h-4 w-px bg-gray-300 mx-1"></div>
+
+                      <button 
+                        onClick={handleAddPage}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 rounded-md text-xs font-medium text-gray-700 hover:bg-gray-50 hover:text-blue-600 transition-colors"
+                        title="Add New Page"
+                      >
+                        <Plus size={12} />
+                        Add
+                      </button>
+
+                      <button 
+                        onClick={handleDeletePage}
+                        className="flex items-center justify-center w-8 h-8 bg-white border border-gray-200 rounded-md text-gray-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all"
+                        title="Delete Current Page"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 text-gray-400">
+                     <div className="flex items-center gap-2 border-l pl-3 ml-1">
+                        {actions}
+                     </div>
+                  </div>
+                </header>
+              )
+            }}
+          />
+        )}
+      </main>
     </div>
   );
 }
