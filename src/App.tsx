@@ -4,9 +4,10 @@ import "@puckeditor/core/dist/index.css";
 
 // Imported Modules
 import { config } from "@/lib/puck.config";
-import { saveProject } from "@/lib/generator";
+import { saveProject, type ExportFormat } from "@/lib/generator";
 import { type Page, type RootProps } from "@/types";
 import { EditorHeader } from "@/components/editor/EditorHeader.tsx";
+import { ExportModal } from "@/components/ExportModal"; // Import the new modal
 
 export default function App() {
   const [pages, setPages] = useState<Page[]>([
@@ -27,6 +28,9 @@ export default function App() {
     }
   ]);
   const [selectedPageId, setSelectedPageId] = useState("home");
+  
+  // New State for Modal
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   const currentPage = useMemo(() => pages.find(p => p.id === selectedPageId), [pages, selectedPageId]);
 
@@ -65,6 +69,16 @@ export default function App() {
     setPages(prev => prev.map(p => p.id === selectedPageId ? { ...p, data: newData } : p));
   };
 
+  const handleExportConfirm = async (format: ExportFormat) => {
+    setIsExportModalOpen(false); // Close modal
+    try {
+      await saveProject(pages, format);
+    } catch (error) {
+      console.error("Project export failed:", error);
+      alert("Export failed. Check console.");
+    }
+  };
+
   if (!currentPage) return null;
 
   return (
@@ -76,19 +90,20 @@ export default function App() {
         ::-webkit-scrollbar-thumb:hover { background: #d1d5db; }
       `}</style>
 
+      {/* Render the Modal */}
+      <ExportModal 
+        isOpen={isExportModalOpen} 
+        onClose={() => setIsExportModalOpen(false)}
+        onConfirm={handleExportConfirm}
+      />
+
       <main className="flex-1 relative overflow-hidden bg-gray-50">
         <Puck
           key={selectedPageId}
           config={config}
           data={currentPage.data}
           onChange={handlePageDataChange}
-          onPublish={async () => {
-            try {
-              await saveProject(pages);
-            } catch (error) {
-              console.error("Project export failed:", error);
-            }
-          }}
+          onPublish={() => setIsExportModalOpen(true)} // Open modal on publish
           overrides={{
             header: ({ actions }) => (
               <EditorHeader 
