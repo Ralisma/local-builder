@@ -5,7 +5,7 @@ import "@puckeditor/core/dist/index.css";
 // Imported Modules
 import { config } from "@/lib/puck.config";
 import { saveProject } from "@/lib/generator";
-import { Page, RootProps } from "@/types";
+import { type Page, type RootProps } from "@/types";
 import { EditorHeader } from "@/components/editor/EditorHeader.tsx";
 
 export default function App() {

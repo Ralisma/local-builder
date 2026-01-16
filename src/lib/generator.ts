@@ -1,7 +1,7 @@
-import { Data } from "@puckeditor/core";
+import { type Data } from "@puckeditor/core";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
-import { RootProps, Page } from "@/types";
+import { type RootProps, type Page } from "@/types";
 
 const COMPONENT_MAP: Record<string, { path: string; imports: string[]; cli: string; }> = {
   Section: { path: "", imports: [], cli: "" },

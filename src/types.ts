@@ -1,4 +1,4 @@
-import { Data } from "@puckeditor/core";
+import { type Data } from "@puckeditor/core";
 
 export type Props = {
   Section: { 

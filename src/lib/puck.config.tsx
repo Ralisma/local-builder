@@ -1,6 +1,6 @@
-import { Config, DropZone } from "@puckeditor/core";
+import { type Config, DropZone } from "@puckeditor/core";
 import { AlertCircle } from "lucide-react";
-import { Props, RootProps } from "@/types";
+import { type Props, type RootProps } from "@/types";
 
 // Shadcn Components
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";

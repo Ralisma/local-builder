@@ -1,6 +1,6 @@
 import React from "react";
 import { Monitor, ChevronRight, File, ChevronDown, Plus, Trash2 } from "lucide-react";
-import { Page, RootProps } from "@/types";
+import { type Page, type RootProps } from "@/types";
 
 interface EditorHeaderProps {
   currentPage: Page;
@@ -38,7 +38,7 @@ export const EditorHeader: React.FC<EditorHeaderProps> = ({
             <select 
               value={selectedPageId}
               onChange={(e) => onSelectPage(e.target.value)}
-              className="appearance-none bg-whiteXB border border-gray-200 text-xs font-medium pl-8 pr-8 py-1.5 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500/20VP cursor-pointer min-w-[140px]"
+              className="appearance-none bg-white border border-gray-200 text-xs font-medium pl-8 pr-8 py-1.5 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer min-w-[140px]"
             >
               {pages.map(p => {
                  const pProps = p.data.root.props as RootProps;
